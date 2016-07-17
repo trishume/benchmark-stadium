@@ -1,0 +1,23 @@
+[package]
+name = "json-rs"
+version = "0.0.1"
+
+[dependencies]
+serde = "*"
+serde_json = "*"
+serde_macros = "*"
+
+[profile.release]
+lto = true
+
+[[bin]]
+name = "json-value-rs"
+path = "src/json_value.rs"
+
+[[bin]]
+name = "json-struct-rs"
+path = "src/json_struct.rs"
+
+[[bin]]
+name = "json-pull-rs"
+path = "src/json_pull.rs"
