@@ -1,4 +1,4 @@
-# Benchmarks Stadium
+# Benchmark Stadium
 
 A collection of programming language benchmarks from various sources combined with scripts to run them and analyze the results.
 Still very much a work in progress.
