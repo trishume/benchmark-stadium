@@ -20,11 +20,10 @@ buildScript = {langName, compileScript, runScript ? null}:
       ${addRunner}
     '';
   in
-  {programName, file}: stdenv.mkDerivation {
+  {programName, src, extraFlags ? ""}: stdenv.mkDerivation {
     name = "bench-stad-${langName}-${programName}";
-    inherit programName;
+    inherit programName src extraFlags;
     builder = langBuilder;
-    src = file;
   };
 copyCompile = outFile: {}: "cp $src $out/${outFile}";
 in
@@ -32,16 +31,48 @@ rec {
   ruby = buildScript {
     langName = "ruby";
     compileScript = copyCompile "run.rb";
-    runScript = {ruby}: "${ruby}/bin/ruby run.rb \"$@\"";
+    runScript = {ruby}: "${ruby}/bin/ruby $extraFlags run.rb \"$@\"";
   };
   python = buildScript {
     langName = "python";
     compileScript = copyCompile "run.py";
-    runScript = {python}: "${python}/bin/python run.py \"$@\"";
+    runScript = {python}: "${python}/bin/python $extraFlags run.py \"$@\"";
+  };
+  nodejs = buildScript {
+    langName = "nodejs";
+    compileScript = copyCompile "run.js";
+    runScript = {nodejs}: "${nodejs}/bin/node $extraFlags run.js \"$@\"";
   };
   go = buildScript {
     langName = "go";
-    compileScript = {go}: "${go}/bin/go build -o $runFile $src";
+    compileScript = {go}: "${go}/bin/go build $extraFlags -o $runFile $src";
   };
-  # runGo = binaryRunner compileGo;
+  gccgo = buildScript {
+    langName = "gccgo";
+    compileScript = {gccgo}: "${gccgo}/bin/gccgo -O3 $extraFlags -o $runFile $src";
+  };
+  dmd = buildScript {
+    langName = "dmd";
+    # D doesn't like the hashes in Nix file paths, so we need to copy it to something with a nice file name
+    compileScript = {dmd}: ''
+      cp $src ./bench.d
+      ${dmd}/bin/dmd -O -release -inline $extraFlags -of$runFile ./bench.d
+    '';
+  };
+  gcc-cpp = buildScript {
+    langName = "g++";
+    compileScript = {gcc}: "${gcc}/bin/g++ -O3 $extraFlags -o $runFile $src";
+  };
+  clang-cpp = buildScript {
+    langName = "clang++";
+    compileScript = {clang}: "${clang}/bin/clang++ -O3 $extraFlags -o $runFile $src";
+  };
+  nim-clang = buildScript {
+    langName = "nim-clang";
+    compileScript = {nim,clang}: ''
+      PATH=${clang}/bin:$PATH
+      cp $src ./bench.nim
+      ${nim}/bin/nim c -d:release --cc:clang $extraFlags -o:$runFile ./bench.nim
+    '';
+  };
 }
