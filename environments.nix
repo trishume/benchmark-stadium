@@ -1,36 +1,47 @@
 with import <nixpkgs> {};
 let
-compileScript = {langName, script, compilerInputs}:
+buildScript = {langName, compileScript, runScript ? null}:
   let
-    langBuilder = writeScript "bench-stad-builder-${langName}.sh" ''
+    runScriptText = callPackage runScript {};
+    compileScriptText = callPackage compileScript {};
+    langRunner = writeScript "bench-stad-run-${langName}.sh" ''
+      #!/bin/sh
+      cd `dirname $0`/../
+      exec ${runScriptText}
+    '';
+    addRunner = if runScript != null then
+        "ln -s ${langRunner} $runFile"
+      else "";
+    langBuilder = writeScript "bench-stad-build-${langName}.sh" ''
       source $stdenv/setup
-      ${script}
+      mkdir -p $out/bin
+      runFile=$out/bin/run
+      ${compileScriptText}
+      ${addRunner}
     '';
   in
-  {benchmarkName, file}: stdenv.mkDerivation {
-    name = "bench-stad-${langName}-${benchmarkName}";
-    inherit benchmarkName;
-    buildInputs = compilerInputs;
+  {programName, file}: stdenv.mkDerivation {
+    name = "bench-stad-${langName}-${programName}";
+    inherit programName;
     builder = langBuilder;
     src = file;
   };
-identityCompiler = langName: compileScript {
-  inherit langName;
-  script = "cp $src $out";
-  compilerInputs = [];
-};
-# runnerScript = {script, compiler}: {benchmarkName, file}: writeScript "runner-${langName}.sh" ''
-#   runFile="${file}"
-#   ${script}
-# '';
-# binaryRunner =
+copyCompile = outFile: {}: "cp $src $out/${outFile}";
 in
 rec {
-  compileRuby = identityCompiler "ruby";
-  compileGo = compileScript {
+  ruby = buildScript {
+    langName = "ruby";
+    compileScript = copyCompile "run.rb";
+    runScript = {ruby}: "${ruby}/bin/ruby run.rb \"$@\"";
+  };
+  python = buildScript {
+    langName = "python";
+    compileScript = copyCompile "run.py";
+    runScript = {python}: "${python}/bin/python run.py \"$@\"";
+  };
+  go = buildScript {
     langName = "go";
-    script = "go build -o $out $src";
-    compilerInputs = [go];
+    compileScript = {go}: "${go}/bin/go build -o $runFile $src";
   };
   # runGo = binaryRunner compileGo;
 }

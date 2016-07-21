@@ -4,9 +4,13 @@ envs = import ./environments.nix;
 in
 {
   havlak = {
-    go = envs.compileGo {
-      benchmarkName = "havlak";
+    go = envs.go {
+      programName = "havlak";
       file = ./benchmarks/kostya/havlak/havlak.go;
+    };
+    python = envs.python {
+      programName = "havlak";
+      file = ./benchmarks/kostya/havlak/havlak.py;
     };
   };
 }
