@@ -1,13 +1,15 @@
 with import <nixpkgs> {};
 let
-buildScript = {langName, compileScript, runScript ? null}:
+timerScript = "${time}/bin/time";
+buildScript = {langName, compileScript, runScript ? null, runSetup ? ""}:
   let
     runScriptText = callPackage runScript {};
     compileScriptText = callPackage compileScript {};
     langRunner = writeScript "bench-stad-run-${langName}.sh" ''
       #!/bin/sh
       cd `dirname $0`/../
-      exec ${runScriptText}
+      ${runSetup}
+      exec ${timerScript} ${runScriptText}
     '';
     addRunner = if runScript != null then
         "ln -s ${langRunner} $runFile"
@@ -74,5 +76,19 @@ rec {
       cp $src ./bench.nim
       ${nim}/bin/nim c -d:release --cc:clang $extraFlags -o:$runFile ./bench.nim
     '';
+  };
+  mono = buildScript {
+    langName = "mono";
+    compileScript = {mono}: "${mono}/bin/mcs -debug- -optimize+ $extraFlags -out:$out/run.exe $src";
+    runScript = {mono}: "${mono}/bin/mono -O=all --gc=sgen run.exe \"$@\"";
+  };
+  scala = buildScript {
+    langName = "scala";
+    compileScript = {scala}: "${scala}/bin/scalac -optimize $extraFlags -d $out $src";
+    runSetup = ''
+      runClassFile=$(ls | grep -F App.class)
+      runClass=''${runClassFile%.class}
+    '';
+    runScript = {scala}: "${scala}/bin/scala -J-Xss100m $runClass \"$@\"";
   };
 }

@@ -20,6 +20,14 @@ in
       programName = "havlak";
       src = ./benchmarks/kostya/havlak/havlak.d;
     };
+    mono = envs.mono {
+      programName = "havlak";
+      src = ./benchmarks/kostya/havlak/havlak.cs;
+    };
+    scala = envs.scala {
+      programName = "havlak";
+      src = ./benchmarks/kostya/havlak/havlak.scala;
+    };
     gcc-cpp = envs.gcc-cpp {
       programName = "havlak";
       src = ./benchmarks/kostya/havlak/havlak.cpp;
