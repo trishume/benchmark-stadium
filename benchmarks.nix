@@ -27,6 +27,7 @@ in
     scala = envs.scala {
       programName = "havlak";
       src = ./benchmarks/kostya/havlak/havlak.scala;
+      runClass = "LoopTesterApp";
     };
     gcc-cpp = envs.gcc-cpp {
       programName = "havlak";

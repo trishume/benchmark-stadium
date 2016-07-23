@@ -1,49 +1,48 @@
 with import <nixpkgs> {};
 let
 timerScript = "${time}/bin/time";
-buildScript = {langName, compileScript, runScript ? null, runSetup ? ""}:
+buildScript = {langName, compileScript ? null, runScript ? null}:
+  assert ((compileScript != null) || (runScript != null));
   let
-    runScriptText = callPackage runScript {};
     compileScriptText = callPackage compileScript {};
-    langRunner = writeScript "bench-stad-run-${langName}.sh" ''
-      #!/bin/sh
-      cd `dirname $0`/../
-      ${runSetup}
-      exec ${timerScript} ${runScriptText}
-    '';
-    addRunner = if runScript != null then
-        "ln -s ${langRunner} $runFile"
-      else "";
-    langBuilder = writeScript "bench-stad-build-${langName}.sh" ''
+    langBuilder = writeScript "bench-build-${langName}.sh" ''
       source $stdenv/setup
       mkdir -p $out/bin
       runFile=$out/bin/run
       ${compileScriptText}
-      ${addRunner}
     '';
   in
-  {programName, src, extraFlags ? ""}: stdenv.mkDerivation {
-    name = "bench-stad-${langName}-${programName}";
-    inherit programName src extraFlags;
-    builder = langBuilder;
-  };
+    args@{programName, src, extraFlags ? "", ...}:
+    let
+      buildDrv = stdenv.mkDerivation {
+        name = "bench-build-${langName}-${programName}";
+        inherit programName src extraFlags;
+        builder = langBuilder;
+      };
+      runScriptText = newScope ({
+        runFile = if compileScript != null then "${buildDrv}" else src;
+      } // args) runScript {};
+      runText = if runScript != null then runScriptText else builtRunProduct;
+    in
+      writeScript "bench-run-${langName}-${programName}" ''
+        #!/bin/sh
+        ${if compileScript != null then "cd ${buildDrv}" else ""}
+        exec ${timerScript} ${runText}
+    '';
 copyCompile = outFile: {}: "cp $src $out/${outFile}";
 in
 rec {
   ruby = buildScript {
     langName = "ruby";
-    compileScript = copyCompile "run.rb";
-    runScript = {ruby}: "${ruby}/bin/ruby $extraFlags run.rb \"$@\"";
+    runScript = {ruby,runFile}: "${ruby}/bin/ruby \"${runFile}\" \"$@\"";
   };
   python = buildScript {
     langName = "python";
-    compileScript = copyCompile "run.py";
-    runScript = {python}: "${python}/bin/python $extraFlags run.py \"$@\"";
+    runScript = {python,runFile}: "${python}/bin/python \"${runFile}\" \"$@\"";
   };
   nodejs = buildScript {
     langName = "nodejs";
-    compileScript = copyCompile "run.js";
-    runScript = {nodejs}: "${nodejs}/bin/node $extraFlags run.js \"$@\"";
+    runScript = {nodejs,runFile}: "${nodejs}/bin/node \"${runFile}\" \"$@\"";
   };
   go = buildScript {
     langName = "go";
@@ -80,15 +79,11 @@ rec {
   mono = buildScript {
     langName = "mono";
     compileScript = {mono}: "${mono}/bin/mcs -debug- -optimize+ $extraFlags -out:$out/run.exe $src";
-    runScript = {mono}: "${mono}/bin/mono -O=all --gc=sgen run.exe \"$@\"";
+    runScript = {mono,runFile}: "${mono}/bin/mono -O=all --gc=sgen \"${runFile}/run.exe\" \"$@\"";
   };
   scala = buildScript {
     langName = "scala";
     compileScript = {scala}: "${scala}/bin/scalac -optimize $extraFlags -d $out $src";
-    runSetup = ''
-      runClassFile=$(ls | grep -F App.class)
-      runClass=''${runClassFile%.class}
-    '';
-    runScript = {scala}: "${scala}/bin/scala -J-Xss100m $runClass \"$@\"";
+    runScript = {scala,runClass}: "${scala}/bin/scala -J-Xss100m ${runClass} \"$@\"";
   };
 }
